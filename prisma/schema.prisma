@@ -1,0 +1,169 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  displayName  String
+  passwordHash String
+  xp           Int      @default(0)
+  level        Int      @default(1)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  moduleProgress ModuleProgress[]
+  userAnswers    UserAnswer[]
+  ratings        Rating[]
+  xpTransactions XPTransaction[]
+
+  @@map("users")
+}
+
+model Module {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  title       String
+  description String
+  emoji       String
+  order       Int      @unique
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  // Relations
+  questions      Question[]
+  videos         Video[]
+  pdfMaterials   PDFMaterial[]
+  moduleProgress ModuleProgress[]
+  xpTransactions XPTransaction[]
+  ratings        Rating[]
+
+  @@map("modules")
+}
+
+model ModuleProgress {
+  id          String    @id @default(cuid())
+  userId      String
+  moduleId    String
+  completed   Boolean   @default(false)
+  score       Int       @default(0)
+  gainedXP    Int       @default(0)
+  attempts    Int       @default(0)
+  completedAt DateTime?
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  module Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, moduleId])
+  @@map("module_progress")
+}
+
+model Question {
+  id           String   @id @default(cuid())
+  moduleId     String
+  text         String
+  options      String[] // Array of answer options
+  correctIndex Int      // Index of the correct answer (0-based)
+  explanation  String?
+  order        Int
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  // Relations
+  module      Module       @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  userAnswers UserAnswer[]
+
+  @@map("questions")
+}
+
+model UserAnswer {
+  id            String   @id @default(cuid())
+  userId        String
+  questionId    String
+  selectedIndex Int      // Index of selected answer (0-based)
+  isCorrect     Boolean
+  answeredAt    DateTime @default(now())
+
+  // Relations
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@map("user_answers")
+}
+
+model Rating {
+  id         String   @id @default(cuid())
+  userId     String?  // Optional for anonymous ratings
+  moduleId   String
+  stars      Int      @db.SmallInt // 1-5 stars
+  clarity    String? // "Sim", "Parcialmente", "Não"
+  organized  String? // "Sim", "Parcialmente", "Não"
+  difficulty String? // "Muito fácil", "Fácil", "Médio", "Difícil", "Muito difícil"
+  feedback   String?
+  createdAt  DateTime @default(now())
+
+  // Relations
+  user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+  module Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@map("ratings")
+}
+
+model Video {
+  id        String   @id @default(cuid())
+  moduleId  String
+  title     String
+  videoId   String   // YouTube video ID
+  code      String?  // Associated code snippet
+  language  String   @default("python")
+  order     Int
+  createdAt DateTime @default(now())
+
+  // Relations
+  module Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@map("videos")
+}
+
+model PDFMaterial {
+  id          String   @id @default(cuid())
+  moduleId    String
+  name        String
+  description String?
+  url         String
+  filename    String
+  order       Int
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  // Relations
+  module Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@map("pdf_materials")
+}
+
+model XPTransaction {
+  id        String   @id @default(cuid())
+  userId    String
+  moduleId  String?
+  amount    Int      // Can be positive or negative
+  reason    String   // "quiz_completion", "level_bonus", "penalty", etc.
+  createdAt DateTime @default(now())
+
+  // Relations
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  module Module? @relation(fields: [moduleId], references: [id], onDelete: SetNull)
+
+  @@map("xp_transactions")
+}
