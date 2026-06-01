@@ -91,28 +91,40 @@ export const userController = {
         });
       }
 
-      // Get module progress
-      const moduleProgress = await prisma.moduleProgress.findMany({
-        where: { userId: req.userId },
-        include: {
-          module: {
+      const modules = await prisma.module.findMany({
+        where: { isActive: true },
+        select: {
+          id: true,
+          title: true,
+          slug: true,
+          moduleProgress: {
+            where: { userId: req.userId },
             select: {
-              id: true,
-              title: true,
-              slug: true,
+              completed: true,
+              score: true,
+              gainedXP: true,
+              attempts: true,
             },
           },
         },
-        orderBy: {
-          module: { order: 'asc' },
-        },
+        orderBy: { order: 'asc' },
       });
 
-      // Get total modules count
-      const totalModules = await prisma.module.count({
-        where: { isActive: true },
+      const moduleProgress = modules.map((module) => {
+        const progress = module.moduleProgress[0];
+
+        return {
+          moduleId: module.id,
+          moduleTitle: module.title,
+          moduleSlug: module.slug,
+          completed: progress?.completed ?? false,
+          score: progress?.score ?? 0,
+          gainedXP: progress?.gainedXP ?? 0,
+          attempts: progress?.attempts ?? 0,
+        };
       });
 
+      const totalModules = modules.length;
       const completedModules = moduleProgress.filter(mp => mp.completed).length;
 
       // Calculate XP for current level and next level
@@ -126,15 +138,7 @@ export const userController = {
         xpForNextLevel,
         completedModules,
         totalModules,
-        moduleProgress: moduleProgress.map(mp => ({
-          moduleId: mp.module.id,
-          moduleTitle: mp.module.title,
-          moduleSlug: mp.module.slug,
-          completed: mp.completed,
-          score: mp.score,
-          gainedXP: mp.gainedXP,
-          attempts: mp.attempts,
-        })),
+        moduleProgress,
       };
 
       res.json({

@@ -1,11 +1,12 @@
 import { Router } from "express";
 import { userController } from "@/controllers/user.controller";
+import { asyncHandler } from "@/middlewares/asyncHandler";
 import { authenticateToken } from "@/middlewares/auth";
 
 const router = Router();
 
 // All user routes require authentication
-router.use(authenticateToken);
+router.use(asyncHandler(authenticateToken));
 
 /**
  * @swagger
@@ -22,7 +23,7 @@ router.use(authenticateToken);
  *       401:
  *         description: ❌ Não autenticado
  */
-router.get("/profile", userController.getProfile);
+router.get("/profile", asyncHandler(userController.getProfile));
 
 /**
  * @swagger
@@ -41,7 +42,7 @@ router.get("/profile", userController.getProfile);
  *       200:
  *         description: ✅ Perfil atualizado
  */
-router.put("/profile", userController.updateProfile);
+router.put("/profile", asyncHandler(userController.updateProfile));
 
 /**
  * @swagger
@@ -67,7 +68,7 @@ router.put("/profile", userController.updateProfile);
  *                 completedModules: 2
  *                 totalModules: 4
  */
-router.get("/progress", userController.getProgress);
+router.get("/progress", asyncHandler(userController.getProgress));
 
 /**
  * @swagger
@@ -92,6 +93,6 @@ router.get("/progress", userController.getProgress);
  *                     moduleTitle: "Fundamentos..."
  *                     createdAt: "2024-01-15T10:30:00Z"
  */
-router.get("/xp-history", userController.getXPHistory);
+router.get("/xp-history", asyncHandler(userController.getXPHistory));
 
 export { router as userRoutes };

@@ -1,11 +1,12 @@
 import { Router } from "express";
 import { xpController } from "@/controllers/xp.controller";
+import { asyncHandler } from "@/middlewares/asyncHandler";
 import { authenticateToken } from "@/middlewares/auth";
 
 const router = Router();
 
 // All XP routes require authentication
-router.use(authenticateToken);
+router.use(asyncHandler(authenticateToken));
 
 /**
  * @swagger
@@ -126,7 +127,7 @@ router.use(authenticateToken);
  *       400:
  *         description: ❌ Dados inválidos
  */
-router.post("/add", xpController.addXP);
+router.post("/add", asyncHandler(xpController.addXP));
 
 /**
  * @swagger
@@ -141,7 +142,7 @@ router.post("/add", xpController.addXP);
  *       - in: query
  *         name: page
  *         required: false
- *         description: Número da página (padrão: 1)
+ *         description: "Numero da pagina (padrao: 1)"
  *         schema:
  *           type: integer
  *           minimum: 1
@@ -150,7 +151,7 @@ router.post("/add", xpController.addXP);
  *       - in: query
  *         name: limit
  *         required: false
- *         description: Itens por página (padrão: 20, máx: 100)
+ *         description: "Itens por pagina (padrao: 20, max: 100)"
  *         schema:
  *           type: integer
  *           minimum: 1
@@ -243,6 +244,6 @@ router.post("/add", xpController.addXP);
  *       401:
  *         description: ❌ Não autenticado
  */
-router.get("/history", xpController.getXPHistory);
+router.get("/history", asyncHandler(xpController.getXPHistory));
 
 export { router as xpRoutes };

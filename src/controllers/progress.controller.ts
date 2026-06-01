@@ -12,6 +12,59 @@ const completeModuleSchema = z.object({
   totalQuestions: z.number().min(1, 'Total questions must be positive'),
 });
 
+async function addXPAndCheckLevel(userId: string, moduleId: string, xpAmount: number, reason: string) {
+  await Promise.all([
+    prisma.user.update({
+      where: { id: userId },
+      data: {
+        xp: { increment: xpAmount },
+      },
+    }),
+    prisma.xPTransaction.create({
+      data: {
+        userId,
+        moduleId,
+        amount: xpAmount,
+        reason,
+      },
+    }),
+  ]);
+}
+
+async function checkLevelUp(userId: string): Promise<boolean> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { xp: true, level: true },
+  });
+
+  if (!user) return false;
+
+  const newLevel = Math.floor(user.xp / config.xp.perLevel) + 1;
+
+  if (newLevel > user.level) {
+    await Promise.all([
+      prisma.user.update({
+        where: { id: userId },
+        data: {
+          level: newLevel,
+          xp: { increment: config.xp.levelUpBonus },
+        },
+      }),
+      prisma.xPTransaction.create({
+        data: {
+          userId,
+          amount: config.xp.levelUpBonus,
+          reason: 'level_up_bonus',
+        },
+      }),
+    ]);
+
+    return true;
+  }
+
+  return false;
+}
+
 export const progressController = {
   async completeModule(req: AuthenticatedRequest, res: Response<ApiResponse>) {
     try {
@@ -61,8 +114,8 @@ export const progressController = {
 
         // Only add XP if not previously completed
         if (!existingProgress.completed && gainedXP > 0) {
-          await this.addXPAndCheckLevel(req.userId!, module.id, gainedXP, 'quiz_completion');
-          leveledUp = await this.checkLevelUp(req.userId!);
+          await addXPAndCheckLevel(req.userId!, module.id, gainedXP, 'quiz_completion');
+          leveledUp = await checkLevelUp(req.userId!);
         }
       } else {
         // Create new progress
@@ -80,8 +133,8 @@ export const progressController = {
 
         // Add XP for completion
         if (gainedXP > 0) {
-          await this.addXPAndCheckLevel(req.userId!, module.id, gainedXP, 'quiz_completion');
-          leveledUp = await this.checkLevelUp(req.userId!);
+          await addXPAndCheckLevel(req.userId!, module.id, gainedXP, 'quiz_completion');
+          leveledUp = await checkLevelUp(req.userId!);
         }
       }
 
@@ -106,64 +159,5 @@ export const progressController = {
       }
       throw error;
     }
-  },
-
-  // Helper methods
-  async addXPAndCheckLevel(userId: string, moduleId: string, xpAmount: number, reason: string) {
-    await Promise.all([
-      // Add XP to user
-      prisma.user.update({
-        where: { id: userId },
-        data: {
-          xp: { increment: xpAmount },
-        },
-      }),
-      // Create XP transaction
-      prisma.xPTransaction.create({
-        data: {
-          userId,
-          moduleId,
-          amount: xpAmount,
-          reason,
-        },
-      }),
-    ]);
-  },
-
-  async checkLevelUp(userId: string): Promise<boolean> {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { xp: true, level: true },
-    });
-
-    if (!user) return false;
-
-    const newLevel = Math.floor(user.xp / config.xp.perLevel) + 1;
-
-    if (newLevel > user.level) {
-      // Level up!
-      await Promise.all([
-        // Update user level
-        prisma.user.update({
-          where: { id: userId },
-          data: {
-            level: newLevel,
-            xp: { increment: config.xp.levelUpBonus }, // Level up bonus
-          },
-        }),
-        // Create level up XP transaction
-        prisma.xPTransaction.create({
-          data: {
-            userId,
-            amount: config.xp.levelUpBonus,
-            reason: 'level_up_bonus',
-          },
-        }),
-      ]);
-
-      return true;
-    }
-
-    return false;
   },
 };

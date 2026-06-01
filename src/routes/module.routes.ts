@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { moduleController } from "@/controllers/module.controller";
+import { asyncHandler } from "@/middlewares/asyncHandler";
 import { optionalAuth } from "@/middlewares/auth";
 
 const router = Router();
@@ -30,7 +31,7 @@ const router = Router();
  *                     questions: 3
  *                     videos: 1
  */
-router.get("/", optionalAuth, moduleController.getModules);
+router.get("/", optionalAuth, asyncHandler(moduleController.getModules));
 
 /**
  * @swagger
@@ -54,7 +55,7 @@ router.get("/", optionalAuth, moduleController.getModules);
  *       404:
  *         description: ❌ Módulo não encontrado
  */
-router.get("/:slug", optionalAuth, moduleController.getModuleBySlug);
+router.get("/:slug", optionalAuth, asyncHandler(moduleController.getModuleBySlug));
 
 /**
  * @swagger
@@ -77,7 +78,7 @@ router.get("/:slug", optionalAuth, moduleController.getModuleBySlug);
 router.get(
   "/:slug/questions",
   optionalAuth,
-  moduleController.getModuleQuestions,
+  asyncHandler(moduleController.getModuleQuestions),
 );
 
 /**
@@ -96,7 +97,7 @@ router.get(
  *       200:
  *         description: ✅ Vídeos do módulo
  */
-router.get("/:slug/videos", optionalAuth, moduleController.getModuleVideos);
+router.get("/:slug/videos", optionalAuth, asyncHandler(moduleController.getModuleVideos));
 
 /**
  * @swagger
@@ -117,7 +118,7 @@ router.get("/:slug/videos", optionalAuth, moduleController.getModuleVideos);
 router.get(
   "/:slug/materials",
   optionalAuth,
-  moduleController.getModuleMaterials,
+  asyncHandler(moduleController.getModuleMaterials),
 );
 
 export { router as moduleRoutes };

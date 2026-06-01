@@ -48,6 +48,17 @@ export function errorHandler(
     }
   }
 
+  if (
+    error instanceof Prisma.PrismaClientInitializationError ||
+    error instanceof Prisma.PrismaClientRustPanicError
+  ) {
+    return res.status(503).json({
+      success: false,
+      error: 'Database unavailable',
+      message: 'Database connection is not available',
+    });
+  }
+
   // Zod validation errors
   if (error instanceof ZodError) {
     return res.status(400).json({

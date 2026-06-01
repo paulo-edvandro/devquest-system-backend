@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { questionController } from "@/controllers/question.controller";
+import { asyncHandler } from "@/middlewares/asyncHandler";
 import { authenticateToken } from "@/middlewares/auth";
 
 const router = Router();
@@ -94,7 +95,11 @@ const router = Router();
  *       400:
  *         description: ❌ Dados inválidos
  */
-router.post("/answer", authenticateToken, questionController.answerQuestion);
+router.post(
+  "/answer",
+  asyncHandler(authenticateToken),
+  asyncHandler(questionController.answerQuestion),
+);
 
 /**
  * @swagger
@@ -164,8 +169,8 @@ router.post("/answer", authenticateToken, questionController.answerQuestion);
  */
 router.get(
   "/:id/result",
-  authenticateToken,
-  questionController.getQuestionResult,
+  asyncHandler(authenticateToken),
+  asyncHandler(questionController.getQuestionResult),
 );
 
 export { router as questionRoutes };
