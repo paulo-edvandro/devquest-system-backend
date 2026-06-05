@@ -1,9 +1,7 @@
-import { Request, Response } from 'express';
-import { prisma } from '@/lib/prisma';
-import { ApiResponse } from '@/types/api';
-import { AuthenticatedRequest } from '@/middlewares/auth';
-
-
+import { Request, Response } from "express";
+import { prisma } from "@/lib/prisma";
+import { ApiResponse } from "@/types/api";
+import { AuthenticatedRequest } from "@/middlewares/auth";
 
 export const moduleController = {
   async getModules(req: AuthenticatedRequest, res: Response<ApiResponse>) {
@@ -36,14 +34,28 @@ export const moduleController = {
             },
           }),
         },
-        orderBy: { order: 'asc' },
+        orderBy: { order: "asc" },
       });
 
-      const modulesWithProgress = modules.map((module: any) => ({
-        ...module,
-        progress: req.userId ? module.moduleProgress?.[0] || null : null,
-        moduleProgress: undefined,
-      }));
+      // compute locked per module using order and user's moduleProgress
+      let prevIncomplete = false;
+
+      const modulesWithProgress = modules.map((module: any) => {
+        const progress = req.userId ? module.moduleProgress?.[0] || null : null;
+        const completed = progress?.completed ?? false;
+        const locked = prevIncomplete;
+
+        if (!completed) {
+          prevIncomplete = true;
+        }
+
+        return {
+          ...module,
+          progress,
+          locked,
+          moduleProgress: undefined,
+        };
+      });
 
       res.json({
         success: true,
@@ -54,10 +66,7 @@ export const moduleController = {
     }
   },
 
-  async getModuleBySlug(
-    req: AuthenticatedRequest,
-    res: Response<ApiResponse>
-  ) {
+  async getModuleBySlug(req: AuthenticatedRequest, res: Response<ApiResponse>) {
     try {
       const { slug } = req.params;
 
@@ -69,7 +78,7 @@ export const moduleController = {
         include: {
           questions: {
             where: { isActive: true },
-            orderBy: { order: 'asc' },
+            orderBy: { order: "asc" },
             select: {
               id: true,
               text: true,
@@ -78,11 +87,11 @@ export const moduleController = {
             },
           },
           videos: {
-            orderBy: { order: 'asc' },
+            orderBy: { order: "asc" },
           },
           pdfMaterials: {
             where: { isActive: true },
-            orderBy: { order: 'asc' },
+            orderBy: { order: "asc" },
           },
           ...(req.userId && {
             moduleProgress: {
@@ -95,8 +104,36 @@ export const moduleController = {
       if (!module) {
         return res.status(404).json({
           success: false,
-          error: 'Module not found',
+          error: "Module not found",
         });
+      }
+
+      // Determine if this module is locked for the current user
+      let locked = false;
+
+      if (req.userId) {
+        const currentOrder = (module as any).order;
+
+        const previousModules = await prisma.module.findMany({
+          where: {
+            isActive: true,
+            order: { lt: currentOrder },
+          },
+          select: {
+            id: true,
+            moduleProgress: {
+              where: { userId: req.userId },
+              select: { completed: true },
+            },
+          },
+          orderBy: { order: "asc" },
+        });
+
+        const hasPrevNotCompleted = previousModules.some(
+          (m: any) => !m.moduleProgress?.[0]?.completed,
+        );
+
+        locked = hasPrevNotCompleted;
       }
 
       const moduleWithProgress = {
@@ -104,6 +141,7 @@ export const moduleController = {
         progress: req.userId
           ? (module as any).moduleProgress?.[0] || null
           : null,
+        locked,
         moduleProgress: undefined,
       };
 
@@ -118,7 +156,7 @@ export const moduleController = {
 
   async getModuleQuestions(
     req: AuthenticatedRequest,
-    res: Response<ApiResponse>
+    res: Response<ApiResponse>,
   ) {
     try {
       const { slug } = req.params;
@@ -134,7 +172,7 @@ export const moduleController = {
       if (!module) {
         return res.status(404).json({
           success: false,
-          error: 'Module not found',
+          error: "Module not found",
         });
       }
 
@@ -149,7 +187,7 @@ export const moduleController = {
           options: true,
           order: true,
         },
-        orderBy: { order: 'asc' },
+        orderBy: { order: "asc" },
       });
 
       res.json({
@@ -161,10 +199,7 @@ export const moduleController = {
     }
   },
 
-  async getModuleVideos(
-    req: AuthenticatedRequest,
-    res: Response<ApiResponse>
-  ) {
+  async getModuleVideos(req: AuthenticatedRequest, res: Response<ApiResponse>) {
     try {
       const { slug } = req.params;
 
@@ -179,13 +214,13 @@ export const moduleController = {
       if (!module) {
         return res.status(404).json({
           success: false,
-          error: 'Module not found',
+          error: "Module not found",
         });
       }
 
       const videos = await prisma.video.findMany({
         where: { moduleId: module.id },
-        orderBy: { order: 'asc' },
+        orderBy: { order: "asc" },
       });
 
       res.json({
@@ -199,7 +234,7 @@ export const moduleController = {
 
   async getModuleMaterials(
     req: AuthenticatedRequest,
-    res: Response<ApiResponse>
+    res: Response<ApiResponse>,
   ) {
     try {
       const { slug } = req.params;
@@ -215,7 +250,7 @@ export const moduleController = {
       if (!module) {
         return res.status(404).json({
           success: false,
-          error: 'Module not found',
+          error: "Module not found",
         });
       }
 
@@ -224,7 +259,7 @@ export const moduleController = {
           moduleId: module.id,
           isActive: true,
         },
-        orderBy: { order: 'asc' },
+        orderBy: { order: "asc" },
       });
 
       res.json({
