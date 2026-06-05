@@ -15,6 +15,8 @@ Backend API para plataforma gamificada de aprendizagem DevQuest - Sistema de qui
 
 ## 📁 Estrutura do Projeto
 
+
+
 ```
 src/
 ├── config/         # Configurações da aplicação
