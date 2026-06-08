@@ -83,12 +83,12 @@ DevQuest/devquest-back/
 Crie um arquivo `.env` na pasta `DevQuest/devquest-back/` com:
 
 ```env
-DATABASE_URL="postgresql://username:password@localhost:5433/devquest_db"
-JWT_SECRET="your-jwt-secret"
+DATABASE_URL="postgresql://postgres:12345678@localhost:5433/devquest_db?schema=public"
+JWT_SECRET="g9B$2mK#pL9!xZ4@vW7*qY1_eR8%tU3"
 JWT_EXPIRES_IN="7d"
 PORT=3001
-NODE_ENV=development
 CORS_ORIGIN="http://localhost:3000"
+NODE_ENV="development"
 RATE_LIMIT_WINDOW_MS=900000
 RATE_LIMIT_MAX_REQUESTS=100
 MAX_FILE_SIZE=10485760
