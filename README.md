@@ -2,91 +2,24 @@
 
 API REST para a plataforma DevQuest, que entrega módulos, quizzes, materiais, progresso e XP.
 
-## 🐳 Rodando o projeto completo com Docker
+## 🐳 Rodando com Docker
 
-Este repositório contém o backend e o `docker-compose.yml`. Para rodar o projeto completo com Docker, o frontend também precisa estar clonado em uma pasta irmã.
-
-Estrutura esperada:
+A configuracao Docker do projeto completo fica em um repositorio separado:
 
 ```text
-alguma-pasta/
+https://github.com/paulo-edvandro/devquest-docker
+```
+
+Para subir PostgreSQL, backend e frontend juntos, clone os tres repositorios como pastas irmas:
+
+```text
+DevQuest/
+├── devquest-docker/
 ├── devquest-back/
 └── devquest-front/
 ```
 
-Clone os dois repositórios:
-
-```bash
-git clone https://github.com/paulo-edvandro/devquest-system-backend.git devquest-back
-git clone https://github.com/Evertonalencard/TrabalhoWebDevQuest-.git devquest-front
-```
-
-Entre no backend:
-
-```bash
-cd devquest-back
-```
-
-Crie o arquivo de ambiente local do Docker:
-
-```bash
-cp .env.docker.example .env.docker
-```
-
-No Windows PowerShell:
-
-```powershell
-Copy-Item .env.docker.example .env.docker
-```
-
-Se a pasta do frontend tiver outro nome ou estiver em outro caminho, ajuste no `.env.docker`:
-
-```env
-FRONTEND_PATH=../devquest-front
-```
-
-Suba banco, backend e frontend:
-
-```bash
-docker compose --env-file .env.docker up --build -d
-```
-
-Acesse:
-
-```text
-Frontend: http://localhost:5173
-Backend health: http://localhost:3001/health
-Swagger: http://localhost:3001/api-docs
-```
-
-Usuário de teste criado pelo seed:
-
-```text
-Email: test@devquest.com
-Senha: 123456
-```
-
-Para parar os containers sem apagar o banco:
-
-```bash
-docker compose --env-file .env.docker down
-```
-
-Para parar e apagar o volume do banco:
-
-```bash
-docker compose --env-file .env.docker down -v
-```
-
-Se alguma porta já estiver em uso, altere no `.env.docker`:
-
-```env
-DB_PORT=5433
-BACKEND_PORT=3001
-FRONTEND_PORT=5173
-```
-
-Dentro do Docker, o frontend chama a API por `/api` via Nginx. Em desenvolvimento local fora do Docker, o frontend continua usando `http://localhost:3001` quando `VITE_API_BASE_URL` não estiver definido.
+Depois siga o README do `devquest-docker`. Este repositorio do backend nao possui mais `docker-compose.yml` nem Dockerfile proprio.
 
 ## 🚀 Tecnologias
 
@@ -169,7 +102,7 @@ DevQuest/devquest-back/
 Crie um arquivo `.env` na pasta `DevQuest/devquest-back/` com:
 
 ```env
-DATABASE_URL="postgresql://postgres:12345678@localhost:5433/devquest_db?schema=public"
+DATABASE_URL="postgresql://postgres:SUASENHA@localhost:SUAPORTA/devquest_db?schema=public"
 JWT_SECRET="g9B$2mK#pL9!xZ4@vW7*qY1_eR8%tU3"
 JWT_EXPIRES_IN="7d"
 PORT=3001
