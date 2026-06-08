@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { authController } from "@/controllers/auth.controller";
+import { asyncHandler } from "@/middlewares/asyncHandler";
 import { authenticateToken } from "@/middlewares/auth";
 
 const router = Router();
@@ -52,7 +53,7 @@ const router = Router();
  *       400:
  *         description: ❌ Dados inválidos (validação falhou)
  */
-router.post("/register", authController.register);
+router.post("/register", asyncHandler(authController.register));
 
 /**
  * @swagger
@@ -106,7 +107,7 @@ router.post("/register", authController.register);
  *       400:
  *         description: ❌ Dados inválidos
  */
-router.post("/login", authController.login);
+router.post("/login", asyncHandler(authController.login));
 
 /**
  * @swagger
@@ -142,6 +143,10 @@ router.post("/login", authController.login);
  *       401:
  *         description: ❌ Token inválido ou expirado
  */
-router.get("/me", authenticateToken, authController.getProfile);
+router.get(
+  "/me",
+  asyncHandler(authenticateToken),
+  asyncHandler(authController.getProfile),
+);
 
 export { router as authRoutes };

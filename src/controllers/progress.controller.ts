@@ -1,33 +1,121 @@
-import { Response } from 'express';
-import { z } from 'zod';
-import { prisma } from '@/lib/prisma';
-import { config } from '@/config/config';
-import { ApiResponse } from '@/types/api';
-import { AuthenticatedRequest } from '@/middlewares/auth';
+import { Response } from "express";
+import { z } from "zod";
+import { prisma } from "@/lib/prisma";
+import { config } from "@/config/config";
+import { ApiResponse } from "@/types/api";
+import { AuthenticatedRequest } from "@/middlewares/auth";
 
 // Validation schemas
 const completeModuleSchema = z.object({
-  moduleSlug: z.string().min(1, 'Module slug is required'),
-  score: z.number().min(0, 'Score must be non-negative'),
-  totalQuestions: z.number().min(1, 'Total questions must be positive'),
+  moduleSlug: z.string().min(1, "Module slug is required"),
+  score: z.number().min(0, "Score must be non-negative"),
+  totalQuestions: z.number().min(1, "Total questions must be positive"),
 });
+
+async function addXPAndCheckLevel(
+  userId: string,
+  moduleId: string,
+  xpAmount: number,
+  reason: string,
+) {
+  await Promise.all([
+    prisma.user.update({
+      where: { id: userId },
+      data: {
+        xp: { increment: xpAmount },
+      },
+    }),
+    prisma.xPTransaction.create({
+      data: {
+        userId,
+        moduleId,
+        amount: xpAmount,
+        reason,
+      },
+    }),
+  ]);
+}
+
+async function checkLevelUp(userId: string): Promise<boolean> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { xp: true, level: true },
+  });
+
+  if (!user) return false;
+
+  const newLevel = Math.floor(user.xp / config.xp.perLevel) + 1;
+
+  if (newLevel > user.level) {
+    await Promise.all([
+      prisma.user.update({
+        where: { id: userId },
+        data: {
+          level: newLevel,
+          xp: { increment: config.xp.levelUpBonus },
+        },
+      }),
+      prisma.xPTransaction.create({
+        data: {
+          userId,
+          amount: config.xp.levelUpBonus,
+          reason: "level_up_bonus",
+        },
+      }),
+    ]);
+
+    return true;
+  }
+
+  return false;
+}
 
 export const progressController = {
   async completeModule(req: AuthenticatedRequest, res: Response<ApiResponse>) {
     try {
-      const { moduleSlug, score, totalQuestions } = completeModuleSchema.parse(req.body);
+      const { moduleSlug, score, totalQuestions } = completeModuleSchema.parse(
+        req.body,
+      );
 
       // Find the module
       const module = await prisma.module.findUnique({
         where: { slug: moduleSlug, isActive: true },
-        select: { id: true, title: true },
+        select: { id: true, title: true, order: true },
       });
 
       if (!module) {
         return res.status(404).json({
           success: false,
-          error: 'Module not found',
+          error: "Module not found",
         });
+      }
+
+      // Check prerequisites: any previous module (order < current) not completed?
+      if (req.userId) {
+        const previousModules = await prisma.module.findMany({
+          where: {
+            isActive: true,
+            order: { lt: module.order },
+          },
+          select: {
+            id: true,
+            moduleProgress: {
+              where: { userId: req.userId },
+              select: { completed: true },
+            },
+          },
+        });
+
+        const hasPrevNotCompleted = previousModules.some(
+          (m: any) => !m.moduleProgress?.[0]?.completed,
+        );
+
+        if (hasPrevNotCompleted) {
+          return res.status(403).json({
+            success: false,
+            error: "Module is locked. Complete previous modules first.",
+          });
+        }
       }
 
       // Calculate XP gained
@@ -53,16 +141,25 @@ export const progressController = {
           data: {
             completed: true,
             score: Math.max(existingProgress.score, score), // Keep best score
-            gainedXP: existingProgress.completed ? existingProgress.gainedXP : gainedXP, // Only gain XP first time
+            gainedXP: existingProgress.completed
+              ? existingProgress.gainedXP
+              : gainedXP, // Only gain XP first time
             attempts: existingProgress.attempts + 1,
-            completedAt: existingProgress.completed ? existingProgress.completedAt : new Date(),
+            completedAt: existingProgress.completed
+              ? existingProgress.completedAt
+              : new Date(),
           },
         });
 
         // Only add XP if not previously completed
         if (!existingProgress.completed && gainedXP > 0) {
-          await this.addXPAndCheckLevel(req.userId!, module.id, gainedXP, 'quiz_completion');
-          leveledUp = await this.checkLevelUp(req.userId!);
+          await addXPAndCheckLevel(
+            req.userId!,
+            module.id,
+            gainedXP,
+            "quiz_completion",
+          );
+          leveledUp = await checkLevelUp(req.userId!);
         }
       } else {
         // Create new progress
@@ -80,8 +177,13 @@ export const progressController = {
 
         // Add XP for completion
         if (gainedXP > 0) {
-          await this.addXPAndCheckLevel(req.userId!, module.id, gainedXP, 'quiz_completion');
-          leveledUp = await this.checkLevelUp(req.userId!);
+          await addXPAndCheckLevel(
+            req.userId!,
+            module.id,
+            gainedXP,
+            "quiz_completion",
+          );
+          leveledUp = await checkLevelUp(req.userId!);
         }
       }
 
@@ -92,78 +194,19 @@ export const progressController = {
           gainedXP: existingProgress?.completed ? 0 : gainedXP,
           leveledUp,
         },
-        message: existingProgress?.completed 
-          ? 'Module progress updated' 
-          : 'Module completed successfully',
+        message: existingProgress?.completed
+          ? "Module progress updated"
+          : "Module completed successfully",
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({
           success: false,
-          error: 'Validation error',
-          message: error.errors.map(e => e.message).join(', '),
+          error: "Validation error",
+          message: error.errors.map((e) => e.message).join(", "),
         });
       }
       throw error;
     }
-  },
-
-  // Helper methods
-  async addXPAndCheckLevel(userId: string, moduleId: string, xpAmount: number, reason: string) {
-    await Promise.all([
-      // Add XP to user
-      prisma.user.update({
-        where: { id: userId },
-        data: {
-          xp: { increment: xpAmount },
-        },
-      }),
-      // Create XP transaction
-      prisma.xPTransaction.create({
-        data: {
-          userId,
-          moduleId,
-          amount: xpAmount,
-          reason,
-        },
-      }),
-    ]);
-  },
-
-  async checkLevelUp(userId: string): Promise<boolean> {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { xp: true, level: true },
-    });
-
-    if (!user) return false;
-
-    const newLevel = Math.floor(user.xp / config.xp.perLevel) + 1;
-
-    if (newLevel > user.level) {
-      // Level up!
-      await Promise.all([
-        // Update user level
-        prisma.user.update({
-          where: { id: userId },
-          data: {
-            level: newLevel,
-            xp: { increment: config.xp.levelUpBonus }, // Level up bonus
-          },
-        }),
-        // Create level up XP transaction
-        prisma.xPTransaction.create({
-          data: {
-            userId,
-            amount: config.xp.levelUpBonus,
-            reason: 'level_up_bonus',
-          },
-        }),
-      ]);
-
-      return true;
-    }
-
-    return false;
   },
 };

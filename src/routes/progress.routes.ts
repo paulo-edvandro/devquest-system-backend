@@ -1,11 +1,12 @@
 import { Router } from "express";
 import { progressController } from "@/controllers/progress.controller";
+import { asyncHandler } from "@/middlewares/asyncHandler";
 import { authenticateToken } from "@/middlewares/auth";
 
 const router = Router();
 
 // All progress routes require authentication
-router.use(authenticateToken);
+router.use(asyncHandler(authenticateToken));
 
 /**
  * @swagger
@@ -123,6 +124,6 @@ router.use(authenticateToken);
  *       400:
  *         description: ❌ Dados inválidos
  */
-router.post("/complete-module", progressController.completeModule);
+router.post("/complete-module", asyncHandler(progressController.completeModule));
 
 export { router as progressRoutes };

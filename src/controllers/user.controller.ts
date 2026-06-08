@@ -1,14 +1,17 @@
-import { Response } from 'express';
-import { z } from 'zod';
-import { prisma } from '@/lib/prisma';
-import { config } from '@/config/config';
-import { ApiResponse } from '@/types/api';
-import { UserProgressResponse, XPHistoryResponse } from '@/types/user';
-import { AuthenticatedRequest } from '@/middlewares/auth';
+import { Response } from "express";
+import { z } from "zod";
+import { prisma } from "@/lib/prisma";
+import { config } from "@/config/config";
+import { ApiResponse } from "@/types/api";
+import { UserProgressResponse, XPHistoryResponse } from "@/types/user";
+import { AuthenticatedRequest } from "@/middlewares/auth";
 
 // Validation schemas
 const updateProfileSchema = z.object({
-  displayName: z.string().min(2, 'Display name must be at least 2 characters').optional(),
+  displayName: z
+    .string()
+    .min(2, "Display name must be at least 2 characters")
+    .optional(),
 });
 
 export const userController = {
@@ -30,7 +33,7 @@ export const userController = {
       if (!user) {
         return res.status(404).json({
           success: false,
-          error: 'User not found',
+          error: "User not found",
         });
       }
 
@@ -63,21 +66,24 @@ export const userController = {
       res.json({
         success: true,
         data: user,
-        message: 'Profile updated successfully',
+        message: "Profile updated successfully",
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({
           success: false,
-          error: 'Validation error',
-          message: error.errors.map(e => e.message).join(', '),
+          error: "Validation error",
+          message: error.errors.map((e) => e.message).join(", "),
         });
       }
       throw error;
     }
   },
 
-  async getProgress(req: AuthenticatedRequest, res: Response<ApiResponse<UserProgressResponse>>) {
+  async getProgress(
+    req: AuthenticatedRequest,
+    res: Response<ApiResponse<UserProgressResponse>>,
+  ) {
     try {
       const user = await prisma.user.findUnique({
         where: { id: req.userId },
@@ -87,33 +93,59 @@ export const userController = {
       if (!user) {
         return res.status(404).json({
           success: false,
-          error: 'User not found',
+          error: "User not found",
         });
       }
 
-      // Get module progress
-      const moduleProgress = await prisma.moduleProgress.findMany({
-        where: { userId: req.userId },
-        include: {
-          module: {
+      const modules = await prisma.module.findMany({
+        where: { isActive: true },
+        select: {
+          id: true,
+          title: true,
+          slug: true,
+          order: true,
+          moduleProgress: {
+            where: { userId: req.userId },
             select: {
-              id: true,
-              title: true,
-              slug: true,
+              completed: true,
+              score: true,
+              gainedXP: true,
+              attempts: true,
             },
           },
         },
-        orderBy: {
-          module: { order: 'asc' },
-        },
+        orderBy: { order: "asc" },
       });
 
-      // Get total modules count
-      const totalModules = await prisma.module.count({
-        where: { isActive: true },
+      // Build module progress with locked flag based on module order
+      let previousIncomplete = false;
+
+      const moduleProgress = modules.map((module) => {
+        const progress = module.moduleProgress[0];
+
+        const completed = progress?.completed ?? false;
+        const locked = previousIncomplete;
+
+        if (!completed) {
+          previousIncomplete = true;
+        }
+
+        return {
+          moduleId: module.id,
+          moduleTitle: module.title,
+          moduleSlug: module.slug,
+          completed,
+          score: progress?.score ?? 0,
+          gainedXP: progress?.gainedXP ?? 0,
+          attempts: progress?.attempts ?? 0,
+          locked,
+        };
       });
 
-      const completedModules = moduleProgress.filter(mp => mp.completed).length;
+      const totalModules = modules.length;
+      const completedModules = moduleProgress.filter(
+        (mp) => mp.completed,
+      ).length;
 
       // Calculate XP for current level and next level
       const xpInCurrentLevel = user.xp % config.xp.perLevel;
@@ -126,15 +158,7 @@ export const userController = {
         xpForNextLevel,
         completedModules,
         totalModules,
-        moduleProgress: moduleProgress.map(mp => ({
-          moduleId: mp.module.id,
-          moduleTitle: mp.module.title,
-          moduleSlug: mp.module.slug,
-          completed: mp.completed,
-          score: mp.score,
-          gainedXP: mp.gainedXP,
-          attempts: mp.attempts,
-        })),
+        moduleProgress,
       };
 
       res.json({
@@ -146,7 +170,10 @@ export const userController = {
     }
   },
 
-  async getXPHistory(req: AuthenticatedRequest, res: Response<ApiResponse<XPHistoryResponse>>) {
+  async getXPHistory(
+    req: AuthenticatedRequest,
+    res: Response<ApiResponse<XPHistoryResponse>>,
+  ) {
     try {
       const transactions = await prisma.xPTransaction.findMany({
         where: { userId: req.userId },
@@ -155,12 +182,12 @@ export const userController = {
             select: { title: true },
           },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         take: 50, // Limit to recent 50 transactions
       });
 
       const historyData: XPHistoryResponse = {
-        transactions: transactions.map(tx => ({
+        transactions: transactions.map((tx) => ({
           id: tx.id,
           amount: tx.amount,
           reason: tx.reason,

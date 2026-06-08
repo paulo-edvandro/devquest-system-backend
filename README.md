@@ -1,214 +1,271 @@
 # DevQuest Backend
 
-Backend API para plataforma gamificada de aprendizagem DevQuest - Sistema de quizzes com XP, níveis e progresso por módulos.
+API REST para a plataforma DevQuest, que entrega módulos, quizzes, materiais, progresso e XP.
+
+## 🐳 Rodando o projeto completo com Docker
+
+Este repositório contém o backend e o `docker-compose.yml`. Para rodar o projeto completo com Docker, o frontend também precisa estar clonado em uma pasta irmã.
+
+Estrutura esperada:
+
+```text
+alguma-pasta/
+├── devquest-back/
+└── devquest-front/
+```
+
+Clone os dois repositórios:
+
+```bash
+git clone https://github.com/paulo-edvandro/devquest-system-backend.git devquest-back
+git clone https://github.com/Evertonalencard/TrabalhoWebDevQuest-.git devquest-front
+```
+
+Entre no backend:
+
+```bash
+cd devquest-back
+```
+
+Crie o arquivo de ambiente local do Docker:
+
+```bash
+cp .env.docker.example .env.docker
+```
+
+No Windows PowerShell:
+
+```powershell
+Copy-Item .env.docker.example .env.docker
+```
+
+Se a pasta do frontend tiver outro nome ou estiver em outro caminho, ajuste no `.env.docker`:
+
+```env
+FRONTEND_PATH=../devquest-front
+```
+
+Suba banco, backend e frontend:
+
+```bash
+docker compose --env-file .env.docker up --build -d
+```
+
+Acesse:
+
+```text
+Frontend: http://localhost:5173
+Backend health: http://localhost:3001/health
+Swagger: http://localhost:3001/api-docs
+```
+
+Usuário de teste criado pelo seed:
+
+```text
+Email: test@devquest.com
+Senha: 123456
+```
+
+Para parar os containers sem apagar o banco:
+
+```bash
+docker compose --env-file .env.docker down
+```
+
+Para parar e apagar o volume do banco:
+
+```bash
+docker compose --env-file .env.docker down -v
+```
+
+Se alguma porta já estiver em uso, altere no `.env.docker`:
+
+```env
+DB_PORT=5433
+BACKEND_PORT=3001
+FRONTEND_PORT=5173
+```
+
+Dentro do Docker, o frontend chama a API por `/api` via Nginx. Em desenvolvimento local fora do Docker, o frontend continua usando `http://localhost:3001` quando `VITE_API_BASE_URL` não estiver definido.
 
 ## 🚀 Tecnologias
 
-- **Node.js** - Runtime JavaScript
-- **Express** - Framework web
-- **TypeScript** - Tipagem estática
-- **Prisma ORM** - Object-Relational Mapping
-- **PostgreSQL** - Banco de dados
-- **JWT** - Autenticação
-- **Bcrypt** - Hash de senhas
-- **Zod** - Validação de schemas
+- **Node.js**
+- **Express**
+- **TypeScript**
+- **Prisma ORM**
+- **PostgreSQL**
+- **JWT** para autenticação
+- **bcryptjs** para hash de senha
+- **Zod** para validação
+- **Helmet / CORS / express-rate-limit** para segurança
 
-## 📁 Estrutura do Projeto
+## 📁 Estrutura do projeto
 
 ```
-src/
-├── config/         # Configurações da aplicação
-├── controllers/    # Controladores das rotas
-├── services/       # Lógica de negócio (opcional)
-├── routes/         # Definição das rotas
-├── middlewares/    # Middlewares customizados
-├── lib/            # Bibliotecas (Prisma client, etc)
-├── utils/          # Funções utilitárias
-├── types/          # Definições de tipos TypeScript
-└── server.ts       # Arquivo principal do servidor
-
-prisma/
-├── schema.prisma   # Schema do banco de dados
-└── seed.ts         # Script para popular dados iniciais
+DevQuest/devquest-back/
+├── prisma/
+│   ├── schema.prisma       # Modelo de dados e schema do banco
+│   └── seed.ts             # Popula módulos, perguntas, vídeos, PDFs e usuário demo
+├── src/
+│   ├── config/             # Configurações e leitura de ambiente
+│   ├── controllers/        # Lógica das rotas
+│   ├── routes/             # Endpoints da API
+│   ├── middlewares/        # Autenticação, erros e logs
+│   ├── lib/                # Prisma client e conteúdo inicial do seed
+│   ├── types/              # Tipos TypeScript
+│   ├── utils/              # Helpers e validações
+│   └── server.ts           # Inicialização do servidor
+└── package.json
 ```
 
-## 🗃️ Entidades Principais
+## 🧠 Como funciona
 
-- **User** - Usuários da plataforma
-- **Module** - Módulos de aprendizagem
-- **ModuleProgress** - Progresso do usuário nos módulos
-- **Question** - Questões dos quizzes
-- **UserAnswer** - Respostas dos usuários
-- **Rating** - Avaliações dos módulos
-- **Video** - Vídeos dos módulos
-- **PDFMaterial** - Materiais em PDF
-- **XPTransaction** - Histórico de transações de XP
+- `src/server.ts` cria o servidor Express e registra middleware e rotas.
+- `src/routes/` define os endpoints da API.
+- `src/controllers/` contém a lógica executada por cada rota.
+- `src/lib/prisma.ts` é o cliente Prisma para acessar o banco.
+- `src/lib/moduleContent.ts` define o conteúdo inicial de módulos, vídeos e PDFs.
+- `src/lib/seed.ts` injeta esses dados no banco e cria o usuário demo.
+- Os arquivos PDF reais estão no frontend; o backend salva apenas as referências (`url`, `videoId`, `filename`).
 
-## 🔗 Principais Endpoints
+## 🔗 Endpoints principais
 
 ### Autenticação
-- `POST /api/auth/register` - Registro de usuário
-- `POST /api/auth/login` - Login
-- `GET /api/auth/me` - Perfil do usuário autenticado
+- `POST /api/auth/register`
+- `POST /api/auth/login`
+- `GET /api/auth/me`
 
 ### Usuário
-- `GET /api/users/profile` - Perfil do usuário
-- `PUT /api/users/profile` - Atualizar perfil
-- `GET /api/users/progress` - Progresso do usuário
-- `GET /api/users/xp-history` - Histórico de XP
+- `GET /api/users/profile`
+- `PUT /api/users/profile`
+- `GET /api/users/progress`
+- `GET /api/users/xp-history`
 
 ### Módulos
-- `GET /api/modules` - Lista todos os módulos
-- `GET /api/modules/:slug` - Detalhes de um módulo
-- `GET /api/modules/:slug/questions` - Questões do módulo
-- `GET /api/modules/:slug/videos` - Vídeos do módulo
-- `GET /api/modules/:slug/materials` - Materiais do módulo
+- `GET /api/modules`
+- `GET /api/modules/:slug`
+- `GET /api/modules/:slug/questions`
+- `GET /api/modules/:slug/videos`
+- `GET /api/modules/:slug/materials`
 
-### Progresso e XP
-- `POST /api/progress/complete-module` - Completar módulo
-- `POST /api/xp/add` - Adicionar XP
-- `GET /api/xp/history` - Histórico de XP
+### Progresso
+- `POST /api/progress/complete-module`
 
 ### Questões
-- `POST /api/questions/answer` - Responder questão
-- `GET /api/questions/:id/result` - Resultado da questão
+- `POST /api/questions/answer`
+- `GET /api/questions/:id/result`
 
 ### Avaliações
-- `POST /api/ratings` - Criar avaliação
-- `GET /api/ratings/stats/:moduleId` - Estatísticas de avaliação
+- `POST /api/ratings`
+- `GET /api/ratings/stats/:moduleId`
 
-## 🛠️ Setup e Instalação
+### XP
+- `POST /api/xp/add`
+- `GET /api/xp/history`
 
-### 1. Instalar Dependências
+## 🛠️ Configuração de ambiente
+
+Crie um arquivo `.env` na pasta `DevQuest/devquest-back/` com:
+
+```env
+DATABASE_URL="postgresql://postgres:12345678@localhost:5433/devquest_db?schema=public"
+JWT_SECRET="g9B$2mK#pL9!xZ4@vW7*qY1_eR8%tU3"
+JWT_EXPIRES_IN="7d"
+PORT=3001
+CORS_ORIGIN="http://localhost:3000"
+NODE_ENV="development"
+RATE_LIMIT_WINDOW_MS=900000
+RATE_LIMIT_MAX_REQUESTS=100
+MAX_FILE_SIZE=10485760
+```
+
+## 🚀 Passo a passo
+
+1. Acesse a pasta do backend:
+
+```bash
+cd DevQuest/devquest-back
+```
+
+2. Instale dependências:
+
 ```bash
 npm install
 ```
 
-### 2. Configurar Variáveis de Ambiente
-Copie o arquivo `environment.example` para `.env` e configure:
-```env
-DATABASE_URL="postgresql://username:password@localhost:5432/devquest_db"
-JWT_SECRET="your-super-secret-jwt-key"
-PORT=3001
-NODE_ENV=development
-CORS_ORIGIN="http://localhost:3000"
+3. Gere o client Prisma:
+
+```bash
+npm run db:generate
 ```
 
-### 3. Configurar Banco de Dados
+4. Rode migrations e popule dados:
+
 ```bash
-# Gerar client do Prisma
-npm run db:generate
-
-# Executar migrations
 npm run db:migrate
-
-# Popular dados iniciais
 npm run db:seed
 ```
 
-### 4. Executar em Desenvolvimento
+5. Inicie o servidor:
+
 ```bash
 npm run dev
 ```
 
-### 5. Scripts Disponíveis
-```bash
-npm run dev           # Desenvolvimento com hot reload
-npm run build         # Build para produção
-npm run start         # Executar build de produção
-npm run db:migrate    # Executar migrations
-npm run db:seed       # Popular dados iniciais
-npm run db:reset      # Reset completo do banco
-npm run db:generate   # Gerar client Prisma
-npm run db:studio     # Abrir Prisma Studio
+6. Abra a API em:
+
+```text
+http://localhost:3001
 ```
 
-## 📊 Sistema de XP e Níveis
+7. Acesse a documentação Swagger em:
 
-- **XP por resposta correta**: 20 XP
-- **XP por nível**: 100 XP
-- **Bônus de level up**: 50 XP
-- **Cálculo de nível**: `Math.floor(totalXP / 100) + 1`
+```text
+http://localhost:3001/api-docs
+```
+
+## ✅ Usuário de teste
+
+- Email: `test@devquest.com`
+- Senha: `123456`
 
 ## 🔐 Autenticação
 
-O sistema utiliza JWT para autenticação. Inclua o token no header:
-```
-Authorization: Bearer <seu-token-jwt>
-```
+Envie o token JWT no header:
 
-## 📝 Dados de Teste
-
-Após executar `npm run db:seed`, você terá:
-- **Usuário teste**: `test@devquest.com` / `123456`
-- **4 módulos** com questões, vídeos e materiais
-- **Progresso parcial** no usuário teste
-- **Avaliações e transações de XP**
-
-## 🌐 CORS
-
-Configurado para aceitar requisições do frontend React em `http://localhost:3000`. Altere a variável `CORS_ORIGIN` conforme necessário.
-
-## 📚 Documentação da API
-
-Todas as rotas retornam respostas no formato:
-```json
-{
-  "success": true|false,
-  "data": {...},
-  "message": "...",
-  "error": "..." // apenas em caso de erro
-}
+```http
+Authorization: Bearer <token>
 ```
 
-Para rotas paginadas:
-```json
-{
-  "success": true,
-  "data": [...],
-  "pagination": {
-    "page": 1,
-    "limit": 20,
-    "total": 100,
-    "pages": 5,
-    "hasNext": true,
-    "hasPrev": false
-  }
-}
+## 📌 Observações
+
+- O backend salva apenas metadados e referências de vídeos/PDFs.
+- Os PDFs reais ficam no frontend em `devquest-front/public/assets/`.
+- Os vídeos são identificados por `videoId` e podem ser links externos.
+
+## 📦 Scripts
+
+```bash
+npm run dev
+npm run build
+npm run start
+npm run db:migrate
+npm run db:seed
+npm run db:reset
+npm run db:generate
+npm run db:studio
 ```
 
-## 🔧 Desenvolvimento
+## 💡 Visão geral para apresentação
 
-### Estrutura Recomendada para Novos Recursos
+O backend faz:
 
-1. **Definir tipos** em `src/types/`
-2. **Criar validações** em `src/utils/validation.ts`
-3. **Implementar service** (opcional) em `src/services/`
-4. **Criar controller** em `src/controllers/`
-5. **Definir rotas** em `src/routes/`
-6. **Registrar rotas** em `src/server.ts`
+- autenticação de usuários
+- listagem de módulos
+- fornecimento de vídeos e PDFs
+- envio e avaliação de respostas
+- contabilização de XP e nível
+- gravação do progresso do usuário
 
-### Padrões de Código
-
-- Use **TypeScript** para tipagem forte
-- Valide dados com **Zod**
-- Trate erros com middleware personalizado
-- Mantenha controllers simples e delegue lógica complexa para services
-- Use transações do Prisma para operações críticas
-
-## 🚨 Produção
-
-Para deploy em produção:
-
-1. Configure variáveis de ambiente adequadas
-2. Execute `npm run build`
-3. Configure proxy reverso (Nginx)
-4. Configure SSL/TLS
-5. Use ferramentas de monitoramento
-6. Configure logs adequados
-
----
-
-## 📞 Suporte
-
-Este é um projeto acadêmico desenvolvido para a disciplina de Desenvolvimento Web. Para dúvidas sobre implementação, consulte a documentação do Prisma, Express e TypeScript.
+O frontend consome essa API para montar a experiência completa.
